@@ -6,19 +6,39 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Header, Query
 from fastapi.responses import JSONResponse
 
+from .http_middleware import AccessLogMiddleware, RateLimitMiddleware
 from .ingest import ingest_record
 from .models import RunRecord
 from .store import connect, get_run, list_runs
 
 app = FastAPI(title="Runstream", version="0.2.0")
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(AccessLogMiddleware)
 
 
 def _db_path() -> Path:
     return Path(os.environ.get("RUNSTREAM_DB", "runstream.db")).resolve()
 
 
+def _env_truthy(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def _require_write_auth(authorization: str | None) -> None:
     expected = os.environ.get("RUNSTREAM_API_KEY")
+    require = _env_truthy("RUNSTREAM_REQUIRE_AUTH")
+    if require:
+        if not expected:
+            raise HTTPException(
+                status_code=503,
+                detail="RUNSTREAM_API_KEY must be set when RUNSTREAM_REQUIRE_AUTH=1",
+            )
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Authorization Bearer token required")
+        token = authorization[7:].strip()
+        if token != expected:
+            raise HTTPException(status_code=403, detail="invalid token")
+        return
     if not expected:
         return
     if not authorization or not authorization.startswith("Bearer "):
@@ -72,7 +92,8 @@ def create_run(
 ) -> dict:
     """
     Upsert a run (same validation + idempotency as file ingest).
-    If env RUNSTREAM_API_KEY is set, require `Authorization: Bearer <key>`.
+    If `RUNSTREAM_REQUIRE_AUTH=1`, Bearer token is **always** required and `RUNSTREAM_API_KEY` must be set.
+    Otherwise, if only `RUNSTREAM_API_KEY` is set, Bearer is required for POST.
     """
     _require_write_auth(authorization)
     action = ingest_record(record, _db_path(), source_path=None)

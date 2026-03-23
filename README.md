@@ -32,7 +32,8 @@ Same body shape as `meta.json` / `RunRecord`. Idempotent via SHA-256 of canonica
 curl -s -X POST http://127.0.0.1:8000/runs -H "Content-Type: application/json" -d @fixtures/example_run/meta.json
 ```
 
-If `RUNSTREAM_API_KEY` is set, send `Authorization: Bearer <key>`.
+- **Dev (default):** if only `RUNSTREAM_API_KEY` is set, send `Authorization: Bearer <key>` on POST.
+- **Production (recommended):** set `RUNSTREAM_REQUIRE_AUTH=1` and **`RUNSTREAM_API_KEY`** — POST without a valid Bearer returns 401/503. Docker Compose enables this by default; override the key via env (see `.env.example`).
 
 ### LLM + tools (optional)
 
@@ -51,6 +52,21 @@ runstream watch fixtures/example_run --db runstream.db --debounce 2
 
 On `meta.json` create/modify under the watched tree, ingest re-runs after **debounce** seconds (default 2). Ctrl+C stops.
 
+### Rate limit & access logs (API)
+
+When **`RUNSTREAM_ENABLE_RATE_LIMIT=1`**, each client IP is limited to **`RUNSTREAM_RATE_LIMIT_RPM`** requests per sliding 60s window (default **120**). `/health`, `/docs`, `/openapi.json`, and `/redoc` are exempt.
+
+With **`runstream serve`**, one-line access logs go to stderr under the logger **`runstream.access`**. Set **`RUNSTREAM_DISABLE_ACCESS_LOG=1`** to turn them off.
+
+### Parquet export
+
+```bash
+pip install 'runstream[parquet]'   # or dev extra already includes pyarrow
+runstream export-parquet --db runstream.db --out runs.parquet
+```
+
+Writes the SQLite `runs` table as Parquet (JSON fields remain JSON strings).
+
 ### Cron (scheduled ingest)
 
 `ingest-once` is idempotent; suitable for cron:
@@ -66,9 +82,12 @@ On `meta.json` create/modify under the watched tree, ingest re-runs after **debo
 ```bash
 mkdir data
 runstream ingest-once fixtures/example_run --db data/runstream.db
+export RUNSTREAM_API_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
 docker compose build
 docker compose up
 ```
+
+Compose sets **`RUNSTREAM_REQUIRE_AUTH=1`** by default; POST `/runs` needs `Authorization: Bearer $RUNSTREAM_API_KEY`. Copy [`.env.example`](.env.example) to tune variables.
 
 API listens on port **8000**; the DB file is `./data/runstream.db` mounted at `/data/runstream.db`.
 
@@ -94,16 +113,16 @@ API listens on port **8000**; the DB file is `./data/runstream.db` mounted at `/
 | FastAPI: `GET /health`, `/runs`, `/runs/{id}`, **`POST /runs`** | Done |
 | OpenAI tools: `search_runs`, `get_run` → `tools.py` / `execute_tool` | Done |
 | `ask_with_llm` + mock regression test | Done |
-| Pytest (18 tests) | Done |
+| Pytest (CI) | Done |
 | GitHub Actions CI | Done |
 | Dockerfile + docker-compose | Done |
 
-### Phase 4 (in progress)
+### Phase 4
 
 1. ~~Watch / cron~~ — **done** (`runstream watch`, cron uses `ingest-once`).
-2. **Auth default-on** — next: `RUNSTREAM_REQUIRE_AUTH` + compose defaults.
-3. **Rate limit + access logs** — then.
-4. **Parquet export** — then.
+2. ~~Auth default-on~~ — **done**: `RUNSTREAM_REQUIRE_AUTH` + Docker Compose + `.env.example`.
+3. ~~Rate limit + access logs~~ — **done**: `RUNSTREAM_ENABLE_RATE_LIMIT`, `RUNSTREAM_RATE_LIMIT_RPM` (default 120), `runstream.access` logs (disable with `RUNSTREAM_DISABLE_ACCESS_LOG=1`).
+4. ~~Parquet export~~ — **done**: `runstream export-parquet --db … --out runs.parquet` (`pip install 'runstream[parquet]'`).
 
 ---
 
@@ -117,6 +136,8 @@ src/runstream/
   tools.py      # OpenAI tool schemas + execute_tool (no shell)
   ask.py        # optional LLM loop
   api.py
+  http_middleware.py  # access logs + optional rate limit
+  parquet_export.py
   cli.py
   watch_ingest.py
 schemas/

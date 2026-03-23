@@ -70,3 +70,12 @@ def test_post_run_validation_error(client_empty_db: TestClient) -> None:
     bad = {**VALID_BODY, "status": "not-a-status"}
     r = client_empty_db.post("/runs", json=bad)
     assert r.status_code == 422
+
+
+def test_post_run_require_auth_without_key_misconfigured(
+    client_empty_db: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RUNSTREAM_REQUIRE_AUTH", "1")
+    monkeypatch.delenv("RUNSTREAM_API_KEY", raising=False)
+    r = client_empty_db.post("/runs", json={**VALID_BODY, "run_id": "misconfig-1"})
+    assert r.status_code == 503

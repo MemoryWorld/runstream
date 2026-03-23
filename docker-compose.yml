@@ -8,3 +8,9 @@ services:
       - ./data:/data
     environment:
       RUNSTREAM_DB: /data/runstream.db
+      # Production-style defaults: override RUNSTREAM_API_KEY in shell or .env
+      RUNSTREAM_REQUIRE_AUTH: "1"
+      RUNSTREAM_API_KEY: ${RUNSTREAM_API_KEY:-change-me-before-exposing-this-port}
+      # Optional hardening (uncomment in .env)
+      # RUNSTREAM_ENABLE_RATE_LIMIT: "1"
+      # RUNSTREAM_RATE_LIMIT_RPM: "120"

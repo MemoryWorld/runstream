@@ -7,6 +7,7 @@ import uvicorn
 
 from .ask import ask_with_llm
 from .ingest import ingest_path
+from .parquet_export import export_runs_parquet
 from .tools import openai_tools_json
 from .watch_ingest import watch_and_ingest
 
@@ -21,6 +22,16 @@ def ingest_once(
     """Scan for meta.json files and upsert into SQLite."""
     stats = ingest_path(path, db)
     typer.echo(f"ingest complete -> {db}: {stats}")
+
+
+@app.command("export-parquet")
+def export_parquet_cmd(
+    out: Path = typer.Option(..., "--out", help="Output .parquet file path"),
+    db: Path = typer.Option(Path("runstream.db"), "--db", help="SQLite database path"),
+) -> None:
+    """Export all rows from the runs table to Parquet (requires pip install 'runstream[parquet]')."""
+    n = export_runs_parquet(db, out)
+    typer.echo(f"exported {n} rows -> {out}")
 
 
 @app.command("watch")
@@ -40,9 +51,16 @@ def serve(
     port: int = typer.Option(8000, "--port"),
 ) -> None:
     """Run HTTP API (FastAPI + uvicorn)."""
+    import logging
     import os
 
     os.environ["RUNSTREAM_DB"] = str(db.resolve())
+    access = logging.getLogger("runstream.access")
+    if not access.handlers:
+        _h = logging.StreamHandler()
+        _h.setFormatter(logging.Formatter("%(levelname)s [access] %(message)s"))
+        access.addHandler(_h)
+    access.setLevel(logging.INFO)
     uvicorn.run(
         "runstream.api:app",
         host=host,
