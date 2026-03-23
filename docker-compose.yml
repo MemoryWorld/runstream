@@ -1,0 +1,10 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      # Host directory: put runstream.db here after `runstream ingest-once ... --db ./data/runstream.db`
+      - ./data:/data
+    environment:
+      RUNSTREAM_DB: /data/runstream.db

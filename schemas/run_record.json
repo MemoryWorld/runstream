@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://runstream.local/schemas/run_record.json",
+  "title": "RunRecord",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run_id", "project", "started_at", "status", "metrics", "artifacts", "tags"],
+  "properties": {
+    "run_id": { "type": "string", "minLength": 1 },
+    "project": { "type": "string", "minLength": 1 },
+    "started_at": { "type": "string", "format": "date-time" },
+    "status": { "type": "string", "enum": ["pending", "running", "completed", "failed", "cancelled"] },
+    "metrics": { "type": "object", "additionalProperties": true },
+    "config_ref": { "type": "string" },
+    "artifacts": { "type": "object", "additionalProperties": { "type": "string" } },
+    "tags": { "type": "array", "items": { "type": "string" }, "minItems": 0 }
+  }
+}
