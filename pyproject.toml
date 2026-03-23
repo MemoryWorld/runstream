@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "runstream"
-version = "0.0.1"
+version = "0.2.0"
 description = "Experiment run ingestion, API surface, and analysis agent (research prototype)"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -16,7 +16,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "httpx>=0.27"]
+llm = ["openai>=1.40"]
+dev = ["pytest>=8.0", "httpx>=0.27", "openai>=1.40"]
 
 [project.scripts]
 runstream = "runstream.cli:main"

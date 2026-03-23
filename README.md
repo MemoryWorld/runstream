@@ -1,6 +1,6 @@
 # Runstream
 
-Ingest experiment `meta.json` records into SQLite, expose them over a small **read-only HTTP API**. Built to demonstrate **data pipeline + service** wiring with tests and CI.
+Ingest experiment `meta.json` into SQLite, expose **GET + POST** HTTP APIs, and optionally drive **OpenAI function-calling** over the same catalog (tools only — **no shell**). Tests + CI on every push.
 
 ---
 
@@ -24,6 +24,25 @@ runstream serve --db runstream.db --port 8000
 
 OpenAPI: `http://127.0.0.1:8000/docs`
 
+### POST `/runs` (HTTP ingest)
+
+Same body shape as `meta.json` / `RunRecord`. Idempotent via SHA-256 of canonical JSON.
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/runs -H "Content-Type: application/json" -d @fixtures/example_run/meta.json
+```
+
+If `RUNSTREAM_API_KEY` is set, send `Authorization: Bearer <key>`.
+
+### LLM + tools (optional)
+
+```bash
+pip install 'runstream[llm]'
+export OPENAI_API_KEY=...
+runstream ask "Which runs are tagged onnx-exported?" --db runstream.db
+runstream tools-json   # dump OpenAI tool definitions
+```
+
 ---
 
 ## Docker
@@ -43,6 +62,7 @@ API listens on port **8000**; the DB file is `./data/runstream.db` mounted at `/
 
 - JSON Schema: [`schemas/run_record.json`](schemas/run_record.json)
 - Example payload: [`fixtures/example_run/meta.json`](fixtures/example_run/meta.json)
+- Tool regression cases: [`fixtures/regression_tools.json`](fixtures/regression_tools.json)
 
 ---
 
@@ -51,25 +71,22 @@ API listens on port **8000**; the DB file is `./data/runstream.db` mounted at `/
 | Area | Status |
 |------|--------|
 | JSON Schema + Pydantic `RunRecord` | Done |
-| Ingest: recursive `meta.json`, validate, SHA-256 idempotency | Done |
-| SQLite store + tag / project / since filters | Done |
-| CLI: `runstream ingest-once`, `runstream serve` | Done |
-| FastAPI: `/health`, `/runs`, `/runs/{run_id}` | Done |
-| Pytest (ingest + API) | Done |
+| Ingest + `ingest_record()` (shared with POST) | Done |
+| SQLite + filters + idempotent upsert | Done |
+| CLI: `ingest-once`, `serve`, `tools-json`, `ask` | Done |
+| FastAPI: `GET /health`, `/runs`, `/runs/{id}`, **`POST /runs`** | Done |
+| OpenAI tools: `search_runs`, `get_run` → `tools.py` / `execute_tool` | Done |
+| `ask_with_llm` + mock regression test | Done |
+| Pytest (18 tests) | Done |
 | GitHub Actions CI | Done |
 | Dockerfile + docker-compose | Done |
 
-### Next (Phase 3)
+### Next (Phase 4)
 
-1. **Agent / tools layer**: OpenAI-style tool definitions wrapping `list_runs` / `get_run` (same query layer as API, no shell).
-2. **CLI `runstream ask`**: optional LLM backend via env; regression fixtures for expected `run_id` answers.
-3. **POST `/runs`**: authenticated ingest through HTTP (same validation as file ingest).
-
-### Later
-
-- File watcher / scheduled ingest
-- Rate limits, API key middleware
-- Export to Parquet
+1. **Watch / schedule**: filesystem watcher or cron-friendly `ingest-once` wrapper.
+2. **Auth default-on**: document `RUNSTREAM_API_KEY` for production; optional JWT later.
+3. **Rate limiting** + request logging middleware.
+4. **Parquet export** of `runs` table for analytics.
 
 ---
 
@@ -77,12 +94,15 @@ API listens on port **8000**; the DB file is `./data/runstream.db` mounted at `/
 
 ```text
 src/runstream/
-  models.py    # RunRecord
-  store.py     # SQLite
-  ingest.py    # scan + upsert
-  api.py       # FastAPI
-  cli.py       # Typer
-schemas/run_record.json
+  models.py
+  store.py
+  ingest.py
+  tools.py      # OpenAI tool schemas + execute_tool (no shell)
+  ask.py        # optional LLM loop
+  api.py
+  cli.py
+schemas/
+fixtures/
 tests/
 ```
 

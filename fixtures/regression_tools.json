@@ -1,0 +1,12 @@
+[
+  {
+    "tool": "search_runs",
+    "arguments": { "tag": "onnx-exported", "limit": 10 },
+    "expect_substring": "exp-2026-03-23-a7f3"
+  },
+  {
+    "tool": "get_run",
+    "arguments": { "run_id": "exp-2026-03-23-a7f3" },
+    "expect_substring": "tiny-lm-baseline"
+  }
+]

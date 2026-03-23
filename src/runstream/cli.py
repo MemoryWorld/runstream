@@ -5,7 +5,9 @@ from pathlib import Path
 import typer
 import uvicorn
 
+from .ask import ask_with_llm
 from .ingest import ingest_path
+from .tools import openai_tools_json
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -21,6 +23,27 @@ def ingest_once(
 
 
 @app.command("serve")
+@app.command("tools-json")
+def tools_json_cmd() -> None:
+    """Print OpenAI-compatible tool definitions (function calling)."""
+    typer.echo(openai_tools_json())
+
+
+@app.command("ask")
+def ask_cmd(
+    question: str = typer.Argument(..., help="Natural-language question (uses LLM + catalog tools)"),
+    db: Path = typer.Option(Path("runstream.db"), "--db", help="SQLite database path"),
+    model: str | None = typer.Option(None, "--model", help="Override OPENAI_MODEL"),
+) -> None:
+    """Query the catalog via OpenAI tool calls (requires OPENAI_API_KEY and pip install 'runstream[llm]')."""
+    try:
+        answer = ask_with_llm(question, db, model=model)
+        typer.echo(answer)
+    except RuntimeError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from e
+
+
 def serve(
     db: Path = typer.Option(Path("runstream.db"), "--db", help="SQLite database path"),
     host: str = typer.Option("127.0.0.1", "--host"),
