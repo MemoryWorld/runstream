@@ -2,6 +2,8 @@
 
 Ingest experiment `meta.json` into SQLite, expose **GET + POST** HTTP APIs, and optionally drive **OpenAI function-calling** over the same catalog (tools only — **no shell**). Tests + CI on every push.
 
+**Current release: 0.3.0** — Phase 4 complete (watch/cron, hardened auth, rate limit + access logs, Parquet export).
+
 ---
 
 ## Quickstart
@@ -108,7 +110,7 @@ API listens on port **8000**; the DB file is `./data/runstream.db` mounted at `/
 | JSON Schema + Pydantic `RunRecord` | Done |
 | Ingest + `ingest_record()` (shared with POST) | Done |
 | SQLite + filters + idempotent upsert | Done |
-| CLI: `ingest-once`, **`watch`**, `serve`, `tools-json`, `ask` | Done |
+| CLI: `ingest-once`, **`watch`**, `serve`, **`export-parquet`**, `tools-json`, `ask` | Done |
 | Filesystem watch + cron doc | Done |
 | FastAPI: `GET /health`, `/runs`, `/runs/{id}`, **`POST /runs`** | Done |
 | OpenAI tools: `search_runs`, `get_run` → `tools.py` / `execute_tool` | Done |
@@ -123,6 +125,15 @@ API listens on port **8000**; the DB file is `./data/runstream.db` mounted at `/
 2. ~~Auth default-on~~ — **done**: `RUNSTREAM_REQUIRE_AUTH` + Docker Compose + `.env.example`.
 3. ~~Rate limit + access logs~~ — **done**: `RUNSTREAM_ENABLE_RATE_LIMIT`, `RUNSTREAM_RATE_LIMIT_RPM` (default 120), `runstream.access` logs (disable with `RUNSTREAM_DISABLE_ACCESS_LOG=1`).
 4. ~~Parquet export~~ — **done**: `runstream export-parquet --db … --out runs.parquet` (`pip install 'runstream[parquet]'`).
+
+### Next / Roadmap (not scheduled)
+
+Ideas for later releases—not a commitment, but so the repo does not read as “finished with nothing left”:
+
+- **Backend scale:** optional PostgreSQL (or a storage abstraction), readiness checks that hit the DB, JSON structured logs for hosted deployments.
+- **API & data:** batch ingest or async jobs for large trees; richer filters (metrics ranges, combined queries); Parquet with clearer column layout or partitioning.
+- **Product:** minimal web UI for browsing runs; streaming or multi-provider options for `ask`.
+- **Hardening:** contract tests against OpenAPI; narrower integration tests for watch/debounce where feasible.
 
 ---
 

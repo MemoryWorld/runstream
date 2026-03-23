@@ -11,7 +11,7 @@ from .ingest import ingest_record
 from .models import RunRecord
 from .store import connect, get_run, list_runs
 
-app = FastAPI(title="Runstream", version="0.2.0")
+app = FastAPI(title="Runstream", version="0.3.0")
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(AccessLogMiddleware)
 
