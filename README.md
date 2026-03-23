@@ -43,6 +43,22 @@ runstream ask "Which runs are tagged onnx-exported?" --db runstream.db
 runstream tools-json   # dump OpenAI tool definitions
 ```
 
+### Watch directory (live ingest)
+
+```bash
+runstream watch fixtures/example_run --db runstream.db --debounce 2
+```
+
+On `meta.json` create/modify under the watched tree, ingest re-runs after **debounce** seconds (default 2). Ctrl+C stops.
+
+### Cron (scheduled ingest)
+
+`ingest-once` is idempotent; suitable for cron:
+
+```bash
+*/15 * * * * cd /path/to/runstream && .venv/bin/runstream ingest-once /data/runs --db /data/runstream.db
+```
+
 ---
 
 ## Docker
@@ -73,7 +89,8 @@ API listens on port **8000**; the DB file is `./data/runstream.db` mounted at `/
 | JSON Schema + Pydantic `RunRecord` | Done |
 | Ingest + `ingest_record()` (shared with POST) | Done |
 | SQLite + filters + idempotent upsert | Done |
-| CLI: `ingest-once`, `serve`, `tools-json`, `ask` | Done |
+| CLI: `ingest-once`, **`watch`**, `serve`, `tools-json`, `ask` | Done |
+| Filesystem watch + cron doc | Done |
 | FastAPI: `GET /health`, `/runs`, `/runs/{id}`, **`POST /runs`** | Done |
 | OpenAI tools: `search_runs`, `get_run` → `tools.py` / `execute_tool` | Done |
 | `ask_with_llm` + mock regression test | Done |
@@ -81,12 +98,12 @@ API listens on port **8000**; the DB file is `./data/runstream.db` mounted at `/
 | GitHub Actions CI | Done |
 | Dockerfile + docker-compose | Done |
 
-### Next (Phase 4)
+### Phase 4 (in progress)
 
-1. **Watch / schedule**: filesystem watcher or cron-friendly `ingest-once` wrapper.
-2. **Auth default-on**: document `RUNSTREAM_API_KEY` for production; optional JWT later.
-3. **Rate limiting** + request logging middleware.
-4. **Parquet export** of `runs` table for analytics.
+1. ~~Watch / cron~~ — **done** (`runstream watch`, cron uses `ingest-once`).
+2. **Auth default-on** — next: `RUNSTREAM_REQUIRE_AUTH` + compose defaults.
+3. **Rate limit + access logs** — then.
+4. **Parquet export** — then.
 
 ---
 
@@ -101,6 +118,7 @@ src/runstream/
   ask.py        # optional LLM loop
   api.py
   cli.py
+  watch_ingest.py
 schemas/
 fixtures/
 tests/

@@ -8,6 +8,7 @@ import uvicorn
 from .ask import ask_with_llm
 from .ingest import ingest_path
 from .tools import openai_tools_json
+from .watch_ingest import watch_and_ingest
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -22,7 +23,34 @@ def ingest_once(
     typer.echo(f"ingest complete -> {db}: {stats}")
 
 
+@app.command("watch")
+def watch_cmd(
+    path: Path = typer.Argument(..., exists=True, help="Directory (or file under a directory) to watch"),
+    db: Path = typer.Option(Path("runstream.db"), "--db", help="SQLite database path"),
+    debounce: float = typer.Option(2.0, "--debounce", help="Seconds to wait after last change before ingest"),
+) -> None:
+    """Watch filesystem and re-run ingest after meta.json changes (debounced)."""
+    watch_and_ingest(path, db, debounce_sec=debounce)
+
+
 @app.command("serve")
+def serve(
+    db: Path = typer.Option(Path("runstream.db"), "--db", help="SQLite database path"),
+    host: str = typer.Option("127.0.0.1", "--host"),
+    port: int = typer.Option(8000, "--port"),
+) -> None:
+    """Run HTTP API (FastAPI + uvicorn)."""
+    import os
+
+    os.environ["RUNSTREAM_DB"] = str(db.resolve())
+    uvicorn.run(
+        "runstream.api:app",
+        host=host,
+        port=port,
+        factory=False,
+    )
+
+
 @app.command("tools-json")
 def tools_json_cmd() -> None:
     """Print OpenAI-compatible tool definitions (function calling)."""
@@ -42,23 +70,6 @@ def ask_cmd(
     except RuntimeError as e:
         typer.echo(str(e), err=True)
         raise typer.Exit(1) from e
-
-
-def serve(
-    db: Path = typer.Option(Path("runstream.db"), "--db", help="SQLite database path"),
-    host: str = typer.Option("127.0.0.1", "--host"),
-    port: int = typer.Option(8000, "--port"),
-) -> None:
-    """Run HTTP API (FastAPI + uvicorn)."""
-    import os
-
-    os.environ["RUNSTREAM_DB"] = str(db.resolve())
-    uvicorn.run(
-        "runstream.api:app",
-        host=host,
-        port=port,
-        factory=False,
-    )
 
 
 def main() -> None:
